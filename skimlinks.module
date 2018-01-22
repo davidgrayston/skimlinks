@@ -360,9 +360,6 @@ function skimlinks_node_view($node, $view_mode, $langcode) {
     return;
   }
 
-  global $base_url;
-  $host = _skimlinks_get_host($base_url);
-
   // Look up the fields to act on.
   foreach (element_children($node->content) as $field_id) {
     if (empty($node->content[$field_id]['#items'])) {
@@ -376,13 +373,10 @@ function skimlinks_node_view($node, $view_mode, $langcode) {
 
       $markup = &$node->content[$field_id][$key]['#markup'];
 
-      // Get all links, excluding internal links.
-      $doc = filter_dom_load($markup);
-      $xpath = new DOMXpath($doc);
-      $elements = $xpath->query("//a[not(contains(@href,'$host'))]");
-
       $changed = FALSE;
-      foreach ($elements as $domElement) {
+
+      // Get all links, excluding internal links.
+      foreach (_skimlinks_get_external_links($markup) as $domElement) {
         $href = $domElement->getAttribute('href');
         if (skimlinks_domain_allowed($href)) {
 
@@ -414,6 +408,22 @@ function skimlinks_node_view($node, $view_mode, $langcode) {
 }
 
 /**
+ * Get all links, excluding internal links.
+ *
+ * @param $markup
+ * @return \DOMNodeList
+ */
+function _skimlinks_get_external_links($markup) {
+  global $base_url;
+  $host = _skimlinks_get_host($base_url);
+
+  // Get all links, excluding internal links.
+  $doc = filter_dom_load($markup);
+  $xpath = new DOMXpath($doc);
+  return $xpath->query("//a[not(contains(@href,'$host'))]");
+}
+
+/**
  * Helper to update the known domains when the entity is created or updated.
  *
  * @param $entity
@@ -430,9 +440,6 @@ function _skimlinks_entity_update_known_domains($entity) {
     return;
   }
 
-  global $base_url;
-  $host = _skimlinks_get_host($base_url);
-
   foreach ($entity as $field_name => $field) {
     if (is_array($field) && isset($field[$entity->language][0]['format'])) {
       // Loop fields.
@@ -441,15 +448,14 @@ function _skimlinks_entity_update_known_domains($entity) {
           continue;
         }
         // Get all links, excluding internal links.
-        $doc = filter_dom_load($field_item['value']);
-        $xpath = new DOMXpath($doc);
-        $elements = $xpath->query("//a[not(contains(@href,'$host'))]");
-
-        foreach ($elements as $domElement) {
+        foreach (_skimlinks_get_external_links($field_item['value']) as $domElement) {
           $href = $domElement->getAttribute('href');
           if (url_is_external($href)) {
             $domain = _skimlinks_get_host($href);
-            skimlinks_validate_merchant($domain, 2);
+            // Check if the domain is known and/or needs refreshing.
+            if (_skimlinks_domain_expired($domain)) {
+              skimlinks_validate_merchant($domain, 2);
+            }
           }
         }
       }
@@ -504,6 +510,16 @@ function skimlinks_merchant_api_call($domain, $timeout = 10) {
 }
 
 /**
+ * Cache ID for allowed URL.
+ *
+ * @param $domain
+ * @return string
+ */
+function _skimlinks_domain_allowed_cid($domain) {
+  return 'skimlinks_domain_allowed:' . $domain;
+}
+
+/**
  * Test if the domain of the url is known, valid and not blacklisted.
  *
  * @param $url The url to be tested.
@@ -525,6 +541,22 @@ function skimlinks_domain_allowed($url) {
   }
 
   $domain = _skimlinks_get_host($url);
+  $cid = _skimlinks_domain_allowed_cid($domain);
+
+  // Return static cache if already looked up.
+  $allowed = &drupal_static($cid);
+  if (!is_null($allowed)) {
+    return $allowed;
+  }
+
+  // Get cached value and statically cache for next lookup.
+  if ($cache = cache_get($cid)) {
+    $allowed = $cache->data;
+    return $allowed;
+  }
+
+  // Not allowed by default.
+  $allowed = FALSE;
 
   $query = db_select('skimlinks_domains', 'w');
   $query->addField('w', 'domain');
@@ -536,8 +568,12 @@ function skimlinks_domain_allowed($url) {
   $result = $query->execute()->fetchAllAssoc('domain');
 
   if (sizeof($result) > 0) {
-    return TRUE;
+    $allowed = TRUE;
   }
+
+  cache_set($cid, $allowed);
+
+  return $allowed;
 }
 
 /**
@@ -574,6 +610,9 @@ function skimlinks_known_domains_update($domain, $valid) {
     ))
     ->execute();
 
+  // Clear last updated cache entry so that it will be checked again.
+  cache_clear_all(_skimlinks_domain_last_updated_cid($domain), 'cache', TRUE);
+
   return TRUE;
 }
 
@@ -597,6 +636,17 @@ function _skimlinks_domain_expired($domain) {
   if (empty($last_updated) || $last_updated + $minutes * 60 < $_SERVER['REQUEST_TIME']) {
     return TRUE;
   }
+  return FALSE;
+}
+
+/**
+ * Cache ID for domain last updated.
+ *
+ * @param $domain
+ * @return string
+ */
+function _skimlinks_domain_last_updated_cid($domain) {
+  return 'skimlinks_domain_last_updated:' . $domain;
 }
 
 /**
@@ -606,12 +656,11 @@ function _skimlinks_domain_expired($domain) {
  * @return mixed
  */
 function _skimlinks_domain_last_updated($domain) {
-  $cid = __FUNCTION__ . ':' . $domain;
-
-  $last_updated = &drupal_static($cid);
+  $cid = _skimlinks_domain_last_updated_cid($domain);
 
   // Return static cache if already looked up.
-  if (!empty($last_updated)) {
+  $last_updated = &drupal_static($cid);
+  if (!is_null($last_updated)) {
     return $last_updated;
   }
 
@@ -648,5 +697,9 @@ function skimlinks_create_blacklist($domains) {
   foreach ($domains as $domain) {
     $query->values(array('domain' => check_plain($domain)));
   }
+
   $query->execute();
+
+  // Clear allowed domain cache.
+  cache_clear_all('skimlinks_domain_allowed:', 'cache', TRUE);
 }
