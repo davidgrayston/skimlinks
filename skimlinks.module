@@ -63,6 +63,9 @@ function skimlinks_api_add_queue_item($domain) {
     // Get the queue handle.
     $q = DrupalQueue::get('skimlinks_api_queue');
     $q->createItem(array($domain));
+
+    // Ensure domain is registered so that we don't fill the queue with duplicates.
+    skimlinks_known_domains_update($domain);
   }
 }
 
@@ -597,9 +600,18 @@ function skimlinks_domain_blacklist() {
  * @param $domain The domain
  * @param $valid True is its valid
  */
-function skimlinks_known_domains_update($domain, $valid) {
+function skimlinks_known_domains_update($domain, $valid = NULL) {
   if (db_table_exists('skimlinks_domains') == FALSE) {
     return;
+  }
+
+  if (is_null($valid)) {
+    $query = db_select('skimlinks_domains', 'w');
+    $query->addField('w', 'last_updated');
+    $query->condition('w.domain', $domain);
+    $valid = (bool) $query->execute()->fetchField();
+    echo $domain . PHP_EOL;
+    var_dump($valid);
   }
 
   db_merge('skimlinks_domains')
@@ -612,7 +624,9 @@ function skimlinks_known_domains_update($domain, $valid) {
     ->execute();
 
   // Clear last updated cache entry so that it will be checked again.
-  cache_clear_all(_skimlinks_domain_last_updated_cid($domain), 'cache', TRUE);
+  $cid = _skimlinks_domain_last_updated_cid($domain);
+  cache_clear_all($cid, 'cache', TRUE);
+  drupal_static_reset($cid);
 
   return TRUE;
 }
