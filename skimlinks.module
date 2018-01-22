@@ -372,11 +372,12 @@ function skimlinks_node_view($node, $view_mode, $langcode) {
       }
 
       $markup = &$node->content[$field_id][$key]['#markup'];
+      $doc = filter_dom_load($markup);
 
       $changed = FALSE;
 
       // Get all links, excluding internal links.
-      foreach (_skimlinks_get_external_links($markup) as $domElement) {
+      foreach (_skimlinks_get_external_links($doc) as $domElement) {
         $href = $domElement->getAttribute('href');
         if (skimlinks_domain_allowed($href)) {
 
@@ -410,15 +411,14 @@ function skimlinks_node_view($node, $view_mode, $langcode) {
 /**
  * Get all links, excluding internal links.
  *
- * @param $markup
+ * @param \DOMDocument $doc
  * @return \DOMNodeList
  */
-function _skimlinks_get_external_links($markup) {
+function _skimlinks_get_external_links($doc) {
   global $base_url;
   $host = _skimlinks_get_host($base_url);
 
   // Get all links, excluding internal links.
-  $doc = filter_dom_load($markup);
   $xpath = new DOMXpath($doc);
   return $xpath->query("//a[not(contains(@href,'$host'))]");
 }
@@ -448,7 +448,8 @@ function _skimlinks_entity_update_known_domains($entity) {
           continue;
         }
         // Get all links, excluding internal links.
-        foreach (_skimlinks_get_external_links($field_item['value']) as $domElement) {
+        $doc = filter_dom_load($field_item['value']);
+        foreach (_skimlinks_get_external_links($doc) as $domElement) {
           $href = $domElement->getAttribute('href');
           if (url_is_external($href)) {
             $domain = _skimlinks_get_host($href);
