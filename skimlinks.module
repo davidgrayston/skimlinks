@@ -314,7 +314,7 @@ function skimlinks_get_redirect_url($path, $node) {
  * @param $type
  */
 function skimlinks_entity_insert($entity, $type) {
-  __skimlinks_entity_update_knwown_domains($entity);
+  _skimlinks_entity_update_known_domains($entity);
 }
 
 /**
@@ -324,7 +324,7 @@ function skimlinks_entity_insert($entity, $type) {
  * @param $type
  */
 function skimlinks_entity_update($entity, $type) {
-  __skimlinks_entity_update_knwown_domains($entity);
+  _skimlinks_entity_update_known_domains($entity);
 }
 
 /**
@@ -418,7 +418,7 @@ function skimlinks_node_view($node, $view_mode, $langcode) {
  *
  * @param $entity
  */
-function __skimlinks_entity_update_knwown_domains($entity) {
+function _skimlinks_entity_update_known_domains($entity) {
   // Check that Server side implementation is enabled.
   if (variable_get('skimlinks_environment', 0) != 1) {
     return;
@@ -446,8 +446,11 @@ function __skimlinks_entity_update_knwown_domains($entity) {
         $elements = $xpath->query("//a[not(contains(@href,'$host'))]");
 
         foreach ($elements as $domElement) {
-          $domain = _skimlinks_get_host($domElement->getAttribute('href'));
-          skimlinks_validate_merchant($domain, 2);
+          $href = $domElement->getAttribute('href');
+          if (url_is_external($href)) {
+            $domain = _skimlinks_get_host($href);
+            skimlinks_validate_merchant($domain, 2);
+          }
         }
       }
     }
@@ -466,8 +469,7 @@ function skimlinks_validate_merchant($domain, $timeout = 10) {
   $result = skimlinks_merchant_api_call($domain, $timeout);
   if (!empty($result->merchants)) {
     skimlinks_known_domains_update($domain, TRUE);
-  }
-  else {
+  } else {
     skimlinks_known_domains_update($domain, FALSE);
   }
 }
@@ -490,6 +492,7 @@ function skimlinks_merchant_api_call($domain, $timeout = 10) {
 
   $ch = curl_init();
   curl_setopt($ch, CURLOPT_HEADER, FALSE);
+  curl_setopt($ch, CURLOPT_FRESH_CONNECT, TRUE);
   curl_setopt($ch, CURLOPT_RETURNTRANSFER, TRUE);
   curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, $timeout);
   curl_setopt($ch, CURLOPT_URL, "$api_endpoint?$query");
@@ -570,6 +573,8 @@ function skimlinks_known_domains_update($domain, $valid) {
       'valid' => ($valid === TRUE) ? 1 : 0,
     ))
     ->execute();
+
+  return TRUE;
 }
 
 /**
@@ -587,15 +592,43 @@ function _skimlinks_domain_expired($domain) {
 
   // Check if the domain was already checked on the last N minutes.
   $minutes = variable_get('skimlinks_domains_update_threshold', 720);
-
-  $query = db_select('skimlinks_domains', 'w');
-  $query->addField('w', 'last_updated');
-  $query->condition('w.domain', $domain);
-  $last_updated = $query->execute()->fetchField();
+  $last_updated = _skimlinks_domain_last_updated($domain);
 
   if (empty($last_updated) || $last_updated + $minutes * 60 < $_SERVER['REQUEST_TIME']) {
     return TRUE;
   }
+}
+
+/**
+ * Get the last updated time for domain.
+ *
+ * @param $domain
+ * @return mixed
+ */
+function _skimlinks_domain_last_updated($domain) {
+  $cid = __FUNCTION__ . ':' . $domain;
+
+  $last_updated = &drupal_static($cid);
+
+  // Return static cache if already looked up.
+  if (!empty($last_updated)) {
+    return $last_updated;
+  }
+
+  // Get cached value and statically cache for next lookup.
+  if ($cache = cache_get($cid)) {
+    $last_updated = $cache->data;
+    return $last_updated;
+  }
+
+  // Lookup value in DB and cache.
+  $query = db_select('skimlinks_domains', 'w');
+  $query->addField('w', 'last_updated');
+  $query->condition('w.domain', $domain);
+  $last_updated = $query->execute()->fetchField();
+  cache_set($cid, $last_updated);
+
+  return $last_updated;
 }
 
 /**
