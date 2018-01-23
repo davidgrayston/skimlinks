@@ -40,6 +40,10 @@ function skimlinks_permission() {
  * Implements hook_cron().
  */
 function skimlinks_cron() {
+  if (!variable_get('skimlinks_api_cron_enabled', 1)) {
+    return;
+  }
+
   // Return if the tables haven't been created yet, this can occur before updates have run.
   if (db_table_exists('skimlinks_domains') == FALSE) {
     return;
@@ -625,7 +629,7 @@ function skimlinks_known_domains_update($domain, $valid = NULL) {
     ))
     ->execute();
 
-  // Clear last updated cache entry so that it will be checked again.
+  // Clear cache so that it will be checked again.
   $cid = _skimlinks_domain_exists_cid($domain);
   cache_clear_all($cid, 'cache', TRUE);
   drupal_static_reset($cid);
