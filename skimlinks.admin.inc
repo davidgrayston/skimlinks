@@ -119,12 +119,12 @@ function skimlinks_admin_settings_form($form_state) {
     ),
   );
 
-  $form['server_side']['cron']['skimlinks_queue_process_time'] = array(
+  $form['server_side']['cron']['skimlinks_cron_process_time'] = array(
     '#type' => 'textfield',
     '#title' => t('Cron processing time (Seconds)'),
     '#size' => 4,
     '#description' => t('The number in seconds to spend when running cron.'),
-    '#default_value' => (int) variable_get('skimlinks_queue_process_time', 60),
+    '#default_value' => (int) variable_get('skimlinks_cron_process_time', 60),
   );
 
   $form['server_side']['cron']['skimlinks_domains_update_threshold'] = array(

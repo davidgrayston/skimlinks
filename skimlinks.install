@@ -110,7 +110,7 @@ function skimlinks_uninstall() {
   variable_del('skimlinks_update_known_domains_on_entity_update');
   variable_del('skimlinks_domains_update_threshold');
   variable_del('skimlinks_api_cron_enabled');
-  variable_del('skimlinks_queue_process_time');
+  variable_del('skimlinks_cron_process_time');
 
   //@todo delete tables
 
