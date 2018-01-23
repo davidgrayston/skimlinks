@@ -76,11 +76,7 @@ function skimlinks_api_add_queue_item($domain) {
  */
 function skimlinks_api_process_queue_item($data) {
   foreach ($data as $domain) {
-    // Check if the domain is known and/or needs refreshing.
-    // This check avoids multiple updates the same domain before it expired.
-    if (_skimlinks_domain_expired($domain)) {
-      skimlinks_validate_merchant($domain);
-    }
+    skimlinks_validate_merchant($domain);
   }
 }
 
