@@ -40,6 +40,11 @@ function skimlinks_permission() {
  * Implements hook_cron().
  */
 function skimlinks_cron() {
+  // Return if the tables haven't been created yet, this can occur before updates have run.
+  if (db_table_exists('skimlinks_domains') == FALSE) {
+    return;
+  }
+
   $end = time() + (int) variable_get('skimlinks_cron_process_time', 60);
   $expired_domains = skimlinks_get_expired_domains_query();
   while (time() < $end && ($item = $expired_domains->fetchObject())) {
@@ -539,6 +544,14 @@ function skimlinks_domain_allowed($url) {
     return $allowed;
   }
 
+  // Return if the tables haven't been created yet, this can occur before updates have run.
+  if (db_table_exists('skimlinks_domains') == FALSE) {
+    return FALSE;
+  }
+  if (db_table_exists('skimlinks_blacklist') == FALSE) {
+    return FALSE;
+  }
+
   // Not allowed by default.
   $allowed = FALSE;
 
@@ -566,6 +579,11 @@ function skimlinks_domain_allowed($url) {
  * @return array The list
  */
 function skimlinks_domain_blacklist() {
+  // Return if the tables haven't been created yet, this can occur before updates have run.
+  if (db_table_exists('skimlinks_blacklist') == FALSE) {
+    return array();
+  }
+
   $result = db_select('skimlinks_blacklist', 'b')
     ->fields('b', array('domain'))
     ->execute()
@@ -582,6 +600,11 @@ function skimlinks_domain_blacklist() {
  * @return bool
  */
 function skimlinks_known_domains_update($domain, $valid = NULL) {
+  // Return if the tables haven't been created yet, this can occur before updates have run.
+  if (db_table_exists('skimlinks_domains') == FALSE) {
+    return FALSE;
+  }
+
   // Create a stub domain entry if we don't yet know if it is valid.
   // - Invalid by default.
   // - Set last_updated to 0 so that it is checked in the next cron run.
@@ -639,6 +662,11 @@ function _skimlinks_domain_exists($domain) {
   if ($cache = cache_get($cid)) {
     $exists = $cache->data;
     return $exists;
+  }
+
+  // Return if the tables haven't been created yet, this can occur before updates have run.
+  if (db_table_exists('skimlinks_domains') == FALSE) {
+    return FALSE;
   }
 
   // Not known by default.
