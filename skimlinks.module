@@ -393,7 +393,7 @@ function skimlinks_node_view($node, $view_mode, $langcode) {
         if (variable_get('skimlinks_api_cron_enabled', 1)) {
           if (url_is_external($href)) {
             $domain = _skimlinks_get_host($href);
-            if (!_skimlinks_domain_exists($domain)) {
+            if (!empty($domain) && !_skimlinks_domain_exists($domain)) {
               skimlinks_known_domains_update($domain);
             }
           }
@@ -454,7 +454,7 @@ function _skimlinks_entity_update_known_domains($entity) {
           if (url_is_external($href)) {
             $domain = _skimlinks_get_host($href);
             // If the domain isn't yet known, look it up straight away.
-            if (!_skimlinks_domain_exists($domain)) {
+            if (!empty($domain) && !_skimlinks_domain_exists($domain)) {
               skimlinks_validate_merchant($domain, 2);
             }
           }
@@ -530,10 +530,14 @@ function _skimlinks_domain_allowed_cid($domain) {
 function skimlinks_domain_allowed($url) {
   // Do not change internal urls.
   if (!url_is_external($url)) {
-    return;
+    return FALSE;
   }
 
   $domain = _skimlinks_get_host($url);
+  if (empty($domain)) {
+    return FALSE;
+  }
+
   $cid = _skimlinks_domain_allowed_cid($domain);
 
   // Return static cache if already looked up.
