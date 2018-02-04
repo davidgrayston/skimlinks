@@ -112,6 +112,9 @@ class SkimlinksDirectTest extends DrupalWebTestCase {
     $value = $this->xpath('//input[@name="skimlinks_link_new_window"]/@value')[0];
     $this->assertEqual($value, '1');
 
+    $value = $this->xpath('//input[@name="skimlinks_link_nofollow"]/@value')[0];
+    $this->assertEqual($value, '1');
+
     $value = $this->xpath('//input[@name="skimlinks_environment" and @checked="checked"]/@value')[0];
     $this->assertEqual($value, '1');
 

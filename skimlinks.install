@@ -103,6 +103,7 @@ function skimlinks_uninstall() {
   variable_del('filter_skimlink_host');
   variable_del('skimlinks_environment');
   variable_del('skimlinks_link_new_window');
+  variable_del('skimlinks_link_nofollow');
   variable_del('skimlinks_merchant_api_endpoint');
   variable_del('skimlinks_merchant_api_key');
   variable_del('skimlinks_merchant_api_account_type');

@@ -156,6 +156,13 @@ function skimlinks_admin_settings_form($form_state) {
     '#default_value' => variable_get('skimlinks_link_new_window', 1),
   );
 
+  $form['server_side']['skimlinks_link_nofollow'] = array(
+    '#type' => 'checkbox',
+    '#title' => t('Make links nofollow'),
+    '#description' => t('Tick the box to make the links nofollow.'),
+    '#default_value' => variable_get('skimlinks_link_nofollow', 1),
+  );
+
   // Custom submit handler must be defined as system_settings_form()
   // adds its own.
   $form['#submit'] = array('skimlinks_admin_settings_form_submit');

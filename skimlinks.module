@@ -382,9 +382,14 @@ function skimlinks_node_view($node, $view_mode, $langcode) {
           $redirect = skimlinks_get_redirect_url($href, $node);
           $domElement->setAttribute('href', $redirect);
 
-          if (variable_get('skimlinks_link_new_window')) {
+          if (variable_get('skimlinks_link_new_window', 1)) {
             $domElement->setAttribute('target', '_blank');
           }
+
+          if (variable_get('skimlinks_link_nofollow', 1)) {
+            $domElement->setAttribute('rel', 'nofollow');
+          }
+
           $changed = TRUE;
         }
 
